@@ -2,6 +2,8 @@
 #define CLIENT_HPP
 #include <iostream>
 #include <cstring>
+#include <set>
+#include <string>
 
 class Client {
 public:
@@ -14,6 +16,12 @@ public:
 	std::string &getBuffer();
 
 	void setNickname(const std::string& nickname);
+	const std::string& getNickname() const;
+	void addChannel(const std::string& channel);
+	void partChannel(const std::string& channel);
+	bool isInChannel(const std::string& channel) const;
+	const std::set<std::string>& getChannels() const;
+
 
 private:
 	int _fd;

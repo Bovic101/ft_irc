@@ -1,6 +1,6 @@
 #include "Client.hpp"
 
-Client::Client(int fd) : _fd(fd), _buffer("") {}
+Client::Client(int fd) : _fd(fd), _nickname(""), _buffer("") {}
 Client::~Client() {
 
 }
@@ -16,4 +16,27 @@ std::string &Client::getBuffer() {
 	return _buffer;
 }
 
+void Client::setNickname(const std::string& nickname) {
+	_nickname = nickname;
+}
+
+const std::string& Client::getNickname() const {
+	return _nickname;
+}
+
+void Client::addChannel(const std::string& channel) {
+	_channels.insert(channel);
+}
+
+void Client::partChannel(const std::string& channel) {
+	_channels.erase(channel);
+}
+
+bool Client::isInChannel(const std::string& channel) const {
+	return _channels.find(channel) != _channels.end();
+}
+
+const std::set<std::string>& Client::getChannels() const {
+	return _channels;
+}
 // Destructor to close the sock
