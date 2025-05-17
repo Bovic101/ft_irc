@@ -12,6 +12,8 @@
 #include <poll.h>
 #include <string>
 #include <map>
+#include <sstream>
+
 
 class Server {
 public:
@@ -21,7 +23,9 @@ public:
     void start(); // This will start the server loop
 	void setupSocket(); // This will set up the server socket
 	void acceptNewClient(); // This will accept new clients
-	void removeClient(int clientFd); // This will accept new clients
+	void removeClient(int clientFd);
+	void parseCommand(int fd, const std::string& command);
+	void handleClientMessage(int clientFd); // This will accept new clients
 
 	// Other methods to handle client communication, etc.
 

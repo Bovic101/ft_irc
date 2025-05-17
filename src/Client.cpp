@@ -2,8 +2,7 @@
 
 Client::Client(int fd) : _fd(fd), _buffer("") {}
 Client::~Client() {
-	
-	
+
 }
 
 int Client::getFd() const {

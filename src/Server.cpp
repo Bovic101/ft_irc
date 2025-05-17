@@ -47,7 +47,7 @@ void Server::acceptNewClient() {
     fcntl(clientFd, F_SETFL, O_NONBLOCK); // Set new client to non-blocking
 	Client newClient(clientFd);
 	// _clients[clientFd] = newClient; // Store the client in the map
-	 _clients.insert(std::make_pair(clientFd, newClient)); // Store the client in the map
+	 _clients.emplace(clientFd, Client(clientFd)); // Store the client in the map
 	// _clients.emplace(clientFd, newClient); // Store the client in the map
 
     pollfd clientPfd;
@@ -73,9 +73,67 @@ void Server::start() {
                 if (_pollfds[i].fd == _serverSocket) {
                     acceptNewClient();
                 } else {
-                    // Later we’ll read from clients here!
+                    handleClientMessage(_pollfds[i].fd);
+					
+
                 }
             }
         }
     }
+}
+
+void Server::handleClientMessage(int clientFd) {
+	char buffer[1024];
+	ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
+	if (bytesRead <= 0) {
+		std::cout << "Client disconnected or error occurred\n";
+		/* close(clientFd); */ removeClient(clientFd);
+		return;
+	}
+
+	buffer[bytesRead] = '\0';
+	// _clients[clientFd].getBuffer() += buffer;
+	auto it = _clients.find(clientFd);
+	if (it == _clients.end()) {
+		auto result = _clients.emplace(clientFd, Client(clientFd));
+		it = result.first;
+	}
+	it->second.appendBuffer(buffer);
+
+	std::string& clientBuffer = it->second.getBuffer();
+	// std::string& clientBuffer = _clients[clientFd].getBuffer();
+	size_t newlinePos;
+
+	while ((newlinePos = clientBuffer.find('\n')) != std::string::npos) {
+		std::string message = clientBuffer.substr(0, newlinePos);
+		clientBuffer.erase(0, newlinePos + 1);
+
+		// Process the message
+		parseCommand(clientFd, message);
+	}
+
+	// Echo the message back to the client
+	send(clientFd, buffer, bytesRead, 0);
+}
+
+void Server::parseCommand(int clientFd, const std::string& command) {
+	std::istringstream iss(command);
+	std::string cmd;
+	iss >> cmd;
+	std::cout << "Parsed command from client " << clientFd << ": [" << cmd << "] Full line: [" << command << "]" << std::endl;
+}
+
+void Server::removeClient(int clientFd) {
+	close(clientFd);
+	_clients.erase(clientFd);
+
+	// Remove the client from the pollfd list
+	for (size_t i = 0; i < _pollfds.size(); ++i) {
+		if (_pollfds[i].fd == clientFd) {
+			_pollfds.erase(_pollfds.begin() + i);
+			break;
+		}
+	}
+
+	std::cout << "Client disconnected! FD: " << clientFd << std::endl;
 }
