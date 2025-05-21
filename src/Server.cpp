@@ -140,12 +140,30 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 			sendMsg(clientFd, "ERROR: Channel cannot be empty\n");
 			return;
 		}
+		if (channel[0] != '#') {
+			sendMsg(clientFd, "ERROR: Channel name must start with #\n");
+			return;
+		}
+		if (_channels[channel].count(clientFd)) {
+			sendMsg(clientFd, "ERROR: Already in channel " + channel + "\n");
+			return;
+		}
+		if (_channelModes[channel].count('i') && !_channelInvites[channel].count(clientFd)) {
+			sendMsg(clientFd, "ERROR: Channel " + channel + " is invite-only\n");
+			return;
+		}
 		_channels[channel].insert(clientFd);
 		_clients[clientFd].addChannel(channel);
+		_channelInvites[channel].erase(clientFd);
 		if (_channels[channel].size() == 1) {
-			_channelAdmins[channel] = clientFd;
+			_channelAdmins[channel].insert(clientFd);
 		}
 		sendMsg(clientFd, "Joined channel: " + channel + "\r\n");
+		for (int fd : _channels[channel]) {
+			if (fd != clientFd) {
+				sendMsg(fd, _clients[clientFd].getNickname() + " has joined the channel\n");
+			}
+		}
 	} else if (cmd == "PART") {
 		std::string channel;
 		iss >> channel;
@@ -205,11 +223,15 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 			sendMsg(clientFd, "ERROR: Channel and target cannot be empty\n");
 			return;
 		}
-		if (_channels.find(channel) == _channels.end() || _channels[channel].find(clientFd) == _channels[channel].end()) {
-			sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
+		if (_channels.find(channel) == _channels.end()) {
+			sendMsg(clientFd, "ERROR: Channel " + channel + " does not exist\n");
 			return;
 		}
-		if (_channels[channel].find(target) == _channels[channel].end()) {
+		if (_channelAdmins[channel].find(clientFd) == _channelAdmins[channel].end()) {
+			sendMsg(clientFd, "ERROR: You are not an operator in channel " + channel + "\n");
+			return;
+		}
+		if (_channels[channel].find(clientFd) == _channels[channel].end()) {
 			sendMsg(clientFd, "ERROR: User " + target + " not found in channel " + channel + "\n");
 			return;
 		}
@@ -226,14 +248,19 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 			return;
 		}
 
+		std::string reason;
+		std::getline(iss, reason);
+		if (!reason.empty() && reason[0] == ' ') reason.erase(0, 1);
+		if (reason.empty()) {
+			reason = "You have been kicked from the channel";
+		}
 		_channels[channel].erase(targetFd);
 		_clients[targetFd].partChannel(channel);
+		
 		sendMsg(targetFd, "You have been kicked from channel " + channel + "\n");
 
 		for (int fd : _channels[channel]) {
-			if (fd != clientFd) {
 				sendMsg(fd, _clients[clientFd].getNickname() + " kicked " + target + " from channel " + channel + "\n");
-			}
 		}
 	}
     else if (cmd == "INVITE") {
@@ -284,11 +311,57 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 			sendMsg(clientFd, "Topic for channel " + channel + " set to: " + topic + "\n");
 		}
     }
-
     else if (cmd == "MODE") {
-        // À implémenter plus tard, gérer les modes (op, voix, etc.)
-        sendMsg(clientFd, "MODE command not implemented yet\r\n");
+        std::string channel, mode;
+		iss >> channel >> mode;
+		if (channel.empty() || mode.empty()) {
+			sendMsg(clientFd, "ERROR: Channel and mode cannot be empty\n");
+			return;
+		}
+		if (_channels[channel].find(clientFd) == _channels[channel].end()) {
+			sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
+			return;
+		}
+		if (mode == "+i") {
+			_channelModes[channel].insert('i');
+			sendMsg(clientFd, "Invite-only mode set for channel " + channel + "\n");
+		} else if (mode == "-i") {
+			_channelModes[channel].erase('i');
+			sendMsg(clientFd, "Invite-only mode removed for channel " + channel + "\n");
+		} else {
+			sendMsg(clientFd, "ERROR: Unknown mode " + mode + "\n");
+			return;
+		}
     }
+	else if (cmd == "WHO") {
+		std::string channel;
+		iss >> channel;
+		if (!channel.empty()) {
+			if (_channels.find(channel) == _channels.end()){
+				sendMsg(clientFd, "ERROR: Channel " + channel + " does not exist\n");
+				return;
+			}
+			if (_channels[channel].find(clientFd) == _channels[channel].end()) {
+				sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
+				return;
+			}
+			sendMsg(clientFd, "Users in channel " + channel + ":\n");
+			for (int fd : _channels[channel]) {
+				std::string nickname = _clients[fd].getNickname();
+				if (!nickname.empty()) {
+					sendMsg(clientFd, nickname + "\n");
+				}
+			}
+		} else {
+			sendMsg(clientFd, "All connected users:\n");
+			for (const auto& pair : _clients) {
+				std::string nickname = pair.second.getNickname();
+				if (!nickname.empty()) {
+					sendMsg(clientFd, nickname + "\n");
+				}
+			}
+		}
+	}
     else {
         sendMsg(clientFd, "421 " + cmd + " :Unknown command\r\n");
     }
