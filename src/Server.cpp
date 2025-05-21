@@ -238,8 +238,10 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 		}
 	}
     else if (cmd == "INVITE") {
-        // À implémenter plus tard, inviter un client dans un channel
-        sendMsg(clientFd, "INVITE command not implemented yet\r\n");
+        std::string username, channel;
+		iss >> username >> channel;
+		if (username.empty() || channel.empty()) {
+			sendMsg(clientFd, "ERROR: Username and channel cannot be empty\n");
     }
 	else if (cmd == "TOPIC") {
         std::string channel;
