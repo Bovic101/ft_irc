@@ -14,7 +14,6 @@ void Server::setupSocket() {
 
     int yes = 1;
     setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-
     fcntl(_serverSocket, F_SETFL, O_NONBLOCK); // Make non-blocking
 
     sockaddr_in addr;
@@ -242,6 +241,26 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 		iss >> username >> channel;
 		if (username.empty() || channel.empty()) {
 			sendMsg(clientFd, "ERROR: Username and channel cannot be empty\n");
+			return;
+		}
+		if (_channels.find(channel) == _channels.end() || _channels[channel].find(clientFd) == _channels[channel].end()) {
+			sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
+			return;
+		}
+		int targetFd = -1;
+		for (const auto& pair : _clients) {
+			if (pair.second.getNickname() == username) {
+				targetFd = pair.first;
+				break;
+			}
+		}
+		if (targetFd == -1) {
+			sendMsg(clientFd, "ERROR: User " + username + " not found\n");
+			return;
+		}
+		_channelInvites[channel].insert(targetFd);
+		sendMsg(targetFd, "You have been invited to join channel " + channel + "\n");
+		sendMsg(clientFd, "User " + username + " has been invited to channel " + channel + "\n");
     }
 	else if (cmd == "TOPIC") {
         std::string channel;

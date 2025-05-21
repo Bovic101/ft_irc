@@ -41,6 +41,7 @@ private:
 	std::map<std::string, int> _channelAdmins;
 	std::map<std::string, std::string> _channelTopics;
 	std::map<std::string, std::set<int> > _channelInvites;
+	std::map<std::string, std::set<char>> _channelModes;
 	int _serverSocket;
 
 };
