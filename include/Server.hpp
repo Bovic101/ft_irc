@@ -29,6 +29,7 @@ public:
 	void parseCommand(int fd, const std::string& command);
 	void handleClientMessage(int clientFd); // This will accept new clients
 	void sendMsg(int clientFd, const std::string& msg);
+	void removeFromPollfd(int clientFd);
 
 	// Other methods to handle client communication, etc.
 

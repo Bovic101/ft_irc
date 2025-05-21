@@ -178,10 +178,6 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 		_channels[channel].erase(clientFd);
 		_clients[clientFd].partChannel(channel);
 		sendMsg(clientFd, "Left channel: " + channel + "\r\n");
-	} else if (cmd == "QUIT") {
-		sendMsg(clientFd, "Goodbye!\n");
-		removeClient(clientFd);
-		return;
 	} else if (cmd == "PRIVMSG") {
 		std::string target, message;
 		iss >> target;
@@ -352,6 +348,37 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 					sendMsg(clientFd, nickname + "\n");
 				}
 			}
+		} else if (cmd == "QUIT") {
+			std::string quit;
+			std::getline(iss, quit);
+			if (!quit.empty() && quit[0] == ' ') 
+				quit = quit.substr(1);
+			else
+				quit = "Client disconnected";
+
+			std::string nickname = _clients[clientFd].getNickname();
+			for (std::set<std::string>::iterator it = _clients[clientFd].getChannels().begin();
+				it != _clients[clientFd].getChannels().end(); ++it) {
+				std::string channel = *it;
+				_channels[channel].erase(clientFd);
+				
+				for (std::set<int>::iterator it2 = _channels[channel].begin();
+					it2 != _channels[channel].end(); ++it2) {
+					sendMsg(*it2, nickname + " has left the channel " + channel + ": " + quit + "\n");
+				}
+				if (_channels[channel].empty()) {
+					_channels.erase(channel);
+					_channelAdmins.erase(channel);
+					_channelTopics.erase(channel);
+					_channelModes.erase(channel);
+					_channelInvites.erase(channel);
+				}
+			}
+			close(clientFd);
+			_clients.erase(clientFd);
+			removeFromPollfd(clientFd);
+			std::cout << "Client " << clientFd << " disconnected: " << quit << std::endl;
+			
 		} else {
 			sendMsg(clientFd, "All connected users:\n");
 			for (const auto& pair : _clients) {
@@ -372,7 +399,14 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 void Server::sendMsg(int clientFd, const std::string& msg) {
 	send(clientFd, msg.c_str(), msg.size(), 0);
 }
-
+void Server::removeFromPollfd(int clientFd) {
+	for (std::vector<struct pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
+		if (it->fd == clientFd) {
+			_pollfds.erase(it);
+			break;
+		}
+	}
+}
 
 void Server::removeClient(int clientFd) {
 	close(clientFd);
