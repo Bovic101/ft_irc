@@ -131,6 +131,10 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 		_clients[clientFd].setNickname(nickname);
 		sendMsg(clientFd, "Nickname set to: " + nickname + "\r\n");
 	} else if (cmd == "JOIN") {
+		if (_clients[clientFd].getNickname().empty()) {
+			sendMsg(clientFd, "ERROR: You must set a nickname first\n");
+			return;
+		}
 		std::string channel;
 		iss >> channel;
 		if (channel.empty()) {
@@ -139,6 +143,9 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 		}
 		_channels[channel].insert(clientFd);
 		_clients[clientFd].addChannel(channel);
+		if (_channels[channel].size() == 1) {
+			_channelAdmins[channel] = clientFd;
+		}
 		sendMsg(clientFd, "Joined channel: " + channel + "\r\n");
 	} else if (cmd == "PART") {
 		std::string channel;
@@ -193,13 +200,70 @@ void Server::parseCommand(int clientFd, const std::string& command) {
 			sendMsg(targetFd, _clients[clientFd].getNickname() + ": " + message + "\n");
 		}
 	} else if (cmd == "KICK") {
+		std::string channel, target;
+		iss >> channel >> target;
+		if (channel.empty() || target.empty()) {
+			sendMsg(clientFd, "ERROR: Channel and target cannot be empty\n");
+			return;
+		}
+		if (_channels.find(channel) == _channels.end() || _channels[channel].find(clientFd) == _channels[channel].end()) {
+			sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
+			return;
+		}
+		if (_channels[channel].find(target) == _channels[channel].end()) {
+			sendMsg(clientFd, "ERROR: User " + target + " not found in channel " + channel + "\n");
+			return;
+		}
 		
-		sendMsg(clientFd, "ERROR: Unknown command\n");
+		int targetFd = -1;
+		for (const auto& pair : _clients) {
+			if (pair.second.getNickname() == target) {
+				targetFd = pair.first;
+				break;
+			}
+		}
+		if (targetFd == -1 || _channels[channel].find(targetFd) == _channels[channel].end()) {
+			sendMsg(clientFd, "ERROR: User " + target + " not found in channel " + channel + "\n");
+			return;
+		}
+
+		_channels[channel].erase(targetFd);
+		_clients[targetFd].partChannel(channel);
+		sendMsg(targetFd, "You have been kicked from channel " + channel + "\n");
+
+		for (int fd : _channels[channel]) {
+			if (fd != clientFd) {
+				sendMsg(fd, _clients[clientFd].getNickname() + " kicked " + target + " from channel " + channel + "\n");
+			}
+		}
 	}
     else if (cmd == "INVITE") {
         // À implémenter plus tard, inviter un client dans un channel
         sendMsg(clientFd, "INVITE command not implemented yet\r\n");
     }
+	else if (cmd == "TOPIC") {
+        std::string channel;
+		std::string topic;
+		iss >> channel;
+		std::getline(iss, topic);
+		if (channel.empty() || topic.empty()) {
+			sendMsg(clientFd, "ERROR: Channel and topic cannot be empty\n");
+			return;
+		}
+		if (!topic.empty() && topic[0] == ' '){
+			topic.erase(0, 1);
+		}
+		if (topic.empty()) {
+			if (_channelTopics.find(channel) != _channelTopics.end()) {
+				sendMsg(clientFd, "Current topic for " + channel + ": " + _channelTopics[channel] + "\n");
+			} else 
+				sendMsg(clientFd, "No topic set for channel " + channel + "\n");
+		} else {
+			_channelTopics[channel] = topic;
+			sendMsg(clientFd, "Topic for channel " + channel + " set to: " + topic + "\n");
+		}
+    }
+
     else if (cmd == "MODE") {
         // À implémenter plus tard, gérer les modes (op, voix, etc.)
         sendMsg(clientFd, "MODE command not implemented yet\r\n");

@@ -37,7 +37,9 @@ private:
     std::string _password;
 	std::vector<struct pollfd> _pollfds;
 	std::map<int, Client> _clients;
-	std::map<std::string, std::set<int> > _channels; // Map to store clients by their file descriptor
+	std::map<std::string, std::set<int> > _channels;
+	std::map<std::string, int> _channelAdmins;
+	std::map<std::string, std::string> _channelTopics;
 	int _serverSocket;
 
 };
