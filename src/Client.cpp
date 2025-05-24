@@ -1,6 +1,7 @@
 #include "Client.hpp"
 
-Client::Client(int fd) : _fd(fd), _nickname(""), _buffer("") {}
+Client::Client() : _fd(-1), _buffer(""), _nickname("") {}
+Client::Client(int fd) : _fd(fd), _buffer(""), _nickname("") {}
 Client::~Client() {
 
 }

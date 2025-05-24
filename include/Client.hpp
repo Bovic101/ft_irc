@@ -7,6 +7,7 @@
 
 class Client {
 public:
+	Client(); //added def constructor
 	Client(int fd);
 
 	~Client();
