@@ -58,4 +58,8 @@ class Channel
         void enableMode(char setmode); //Enable channel mode
         void disableMode(char setmode);
 };
+<<<<<<< HEAD
 #endif
+=======
+#endif
+>>>>>>> 9fa3a53 (implementationn of the channel.cpp)
