@@ -1,6 +1,13 @@
 #include "parse_input.hpp"
-#include <cctype>
 
+static std::string to_uppercase(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    for (char c : str) {
+        result += std::toupper(static_cast<unsigned char>(c));
+    }
+    return result;
+}
 // Default constructor
 ParseCmd::ParseCmd() = default;
 
@@ -37,7 +44,6 @@ ParseCmd& ParseCmd::operator=(ParseCmd&& other) noexcept {
 // Destructor
 ParseCmd::~ParseCmd() = default;
 
-// ✅ FIXED: Accept lines ending in \n or \r\n from the buffer
 std::vector<std::string> InputParser::XtractInput(std::string& buf) {
     std::vector<std::string> FullCmd;
     size_t pos;
@@ -87,15 +93,33 @@ std::vector<std::string> InputParser::splitCmd(const std::string& line) {
 }
 
 // Parses a full IRC line like "NICK john" into a ParseCmd object
-ParseCmd InputParser::parseCommand(const std::string& line) {
+ParseCmd InputParser::parseCommand(const std::string& line) 
+{
     std::vector<std::string> tokens = splitCmd(line);
 
-    if (!tokens.empty()) {
-        std::string cmd = tokens[0];     // First token is the command
-        tokens.erase(tokens.begin());   // Remaining are arguments
-        return ParseCmd(cmd, tokens);
-    }
+    if (tokens.empty())
+        return ParseCmd();
 
-    return ParseCmd();
+    std::string cmd = to_uppercase(tokens[0]);  //Take the first token as command and convert it 2 uppercase
+    tokens.erase(tokens.begin());
+
+    if (cmd == "MODE" && tokens.size() >= 2) //handle MODE command
+    {
+        const std::string& modeFlags = tokens[1];
+
+        if (!modeFlags.empty() && (modeFlags[0] == '+' || modeFlags[0] == '-')) //check if modeFlags starts with '+' or '-'
+        {
+            std::vector<std::string> parsedInput;
+            parsedInput.push_back(tokens[0]);      // To add channel name as first argument
+            parsedInput.push_back(modeFlags);      // To add the mode flag like  "+o"
+
+            for (size_t i = 2; i < tokens.size(); ++i)
+                parsedInput.push_back(tokens[i]);
+
+            return ParseCmd(cmd, parsedInput);
+        }
+    }
+    return ParseCmd(cmd, tokens); // Thi return a default the command and its arguments
 }
+
 

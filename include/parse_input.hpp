@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <cctype>
 #include <iostream>
 
 // This Stores parsed command and its arguments
