@@ -4,7 +4,7 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -Iinclude
 
 # Files and directories
 NAME    = ircserv
-SRCS    = main.cpp src/Server.cpp src/Client.cpp 
+SRCS    = main.cpp src/Server.cpp src/Client.cpp src/channel.cpp src/parse_input.cpp
 OBJS    = $(SRCS:.cpp=.o)
 
 # Rules

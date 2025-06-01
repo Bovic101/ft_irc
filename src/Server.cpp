@@ -14,7 +14,7 @@ void Server::setupSocket() {
 
     int yes = 1;
     setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-    fcntl(_serverSocket, F_SETFL, O_NONBLOCK); // Make non-blocking
+    fcntl(_serverSocket, F_SETFL, O_NONBLOCK);
 
     sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
@@ -43,11 +43,8 @@ void Server::acceptNewClient() {
     if (clientFd < 0)
         return;
 
-    fcntl(clientFd, F_SETFL, O_NONBLOCK); // Set new client to non-blocking
-	Client newClient(clientFd);
-	// _clients[clientFd] = newClient; // Store the client in the map
-	 _clients.emplace(clientFd, Client(clientFd)); // Store the client in the map
-	// _clients.emplace(clientFd, newClient); // Store the client in the map
+    fcntl(clientFd, F_SETFL, O_NONBLOCK);
+    _clients.emplace(clientFd, Client(clientFd));
 
     pollfd clientPfd;
     clientPfd.fd = clientFd;
@@ -73,8 +70,6 @@ void Server::start() {
                     acceptNewClient();
                 } else {
                     handleClientMessage(_pollfds[i].fd);
-					
-
                 }
             }
         }
@@ -82,343 +77,121 @@ void Server::start() {
 }
 
 void Server::handleClientMessage(int clientFd) {
-	char buffer[1024];
-	ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
-	if (bytesRead <= 0) {
-		std::cout << "Client disconnected or error occurred\n";
-		/* close(clientFd); */ removeClient(clientFd);
-		return;
-	}
+    char buffer[1024];
+    ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
+    if (bytesRead <= 0) {
+        std::cout << "Client disconnected or error occurred\n";
+        removeClient(clientFd);
+        return;
+    }
 
-	buffer[bytesRead] = '\0';
-	// _clients[clientFd].getBuffer() += buffer;
-	auto it = _clients.find(clientFd);
-	if (it == _clients.end()) {
-		auto result = _clients.emplace(clientFd, Client(clientFd));
-		it = result.first;
-	}
-	it->second.appendBuffer(buffer);
+    buffer[bytesRead] = '\0'; // ✅ fixed here
 
-	std::string& clientBuffer = it->second.getBuffer();
-	// std::string& clientBuffer = _clients[clientFd].getBuffer();
-	size_t newlinePos;
+    auto it = _clients.find(clientFd);
+    if (it == _clients.end()) {
+        auto result = _clients.emplace(clientFd, Client(clientFd));
+        it = result.first;
+    }
+    it->second.appendBuffer(buffer);
 
-	while ((newlinePos = clientBuffer.find('\n')) != std::string::npos) {
-		std::string message = clientBuffer.substr(0, newlinePos);
-		clientBuffer.erase(0, newlinePos + 1);
+    std::string& clientBuffer = it->second.getBuffer();
+    std::vector<std::string> fullLines = InputParser::XtractInput(clientBuffer);
 
-		// Process the message
-		parseCommand(clientFd, message);
-	}
-
-	// Echo the message back to the client
-	send(clientFd, buffer, bytesRead, 0);
+    for (const std::string& line : fullLines) {
+        parseCommand(clientFd, line);
+    }
 }
 
-void Server::parseCommand(int clientFd, const std::string& command) {
-	std::istringstream iss(command);
-	std::string cmd;
-	iss >> cmd;
+void Server::parseCommand(int clientFd, const std::string& line) {
+    ParseCmd parsed = InputParser::parseCommand(line);
+    const std::string& cmd = parsed.command;
+    const std::vector<std::string>& args = parsed.args;
 
-	if (cmd == "NICK") {
-		std::string nickname;
-		iss >> nickname;
-		if (nickname.empty()) {
-			sendMsg(clientFd, "ERROR: Nickname cannot be empty\n");
-			return;
-		}
-		_clients[clientFd].setNickname(nickname);
-		sendMsg(clientFd, "Nickname set to: " + nickname + "\r\n");
-	} else if (cmd == "JOIN") {
-		if (_clients[clientFd].getNickname().empty()) {
-			sendMsg(clientFd, "ERROR: You must set a nickname first\n");
-			return;
-		}
-		std::string channel;
-		iss >> channel;
-		if (channel.empty()) {
-			sendMsg(clientFd, "ERROR: Channel cannot be empty\n");
-			return;
-		}
-		if (channel[0] != '#') {
-			sendMsg(clientFd, "ERROR: Channel name must start with #\n");
-			return;
-		}
-		if (_channels[channel].count(clientFd)) {
-			sendMsg(clientFd, "ERROR: Already in channel " + channel + "\n");
-			return;
-		}
-		if (_channelModes[channel].count('i') && !_channelInvites[channel].count(clientFd)) {
-			sendMsg(clientFd, "ERROR: Channel " + channel + " is invite-only\n");
-			return;
-		}
-		_channels[channel].insert(clientFd);
-		_clients[clientFd].addChannel(channel);
-		_channelInvites[channel].erase(clientFd);
-		if (_channels[channel].size() == 1) {
-			_channelAdmins[channel].insert(clientFd);
-		}
-		sendMsg(clientFd, "Joined channel: " + channel + "\r\n");
-		for (int fd : _channels[channel]) {
-			if (fd != clientFd) {
-				sendMsg(fd, _clients[clientFd].getNickname() + " has joined the channel\n");
-			}
-		}
-	} else if (cmd == "PART") {
-		std::string channel;
-		iss >> channel;
-		if (channel.empty()) {
-			sendMsg(clientFd, "ERROR: Channel cannot be empty\n");
-			return;
-		}
-		if (_channels.find(channel) == _channels.end() || _channels[channel].find(clientFd) == _channels[channel].end()) {
-			sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
-			return;
-		}
-		_channels[channel].erase(clientFd);
-		_clients[clientFd].partChannel(channel);
-		sendMsg(clientFd, "Left channel: " + channel + "\r\n");
-	} else if (cmd == "PRIVMSG") {
-		std::string target, message;
-		iss >> target;
-		std::getline(iss, message);
-		if (target.empty() || message.empty()) {
-			sendMsg(clientFd, "ERROR: Target and message cannot be empty\n");
-			return;
-		}
-		if (!message.empty() && message[0] == ' ') message.erase(0, 1); 
+    if (cmd == "NICK") {
+        if (args.empty()) {
+            sendMsg(clientFd, "ERROR: Nickname cannot be empty\r\n");
+            return;
+        }
+        const std::string& nickname = args[0];
 
-		if (target[0] == '#') {
-			if (_channels.find(target) == _channels.end() || _channels[target].find(clientFd) == _channels[target].end()) {
-				sendMsg(clientFd, "ERROR: Not in channel " + target + "\n");
-				return;
-			}
-			for (int fd : _channels[target]) {
-				if (fd != clientFd) {
-					sendMsg(fd, _clients[clientFd].getNickname() + ": " + message + "\n");
-				}
-			}
-		} else {
-			int targetFd = -1;
-			for (const auto& pair : _clients) {
-				if (pair.second.getNickname() == target) {
-					targetFd = pair.first;
-					break;
-				}
-			}
-			if (targetFd == -1) {
-				sendMsg(clientFd, "ERROR: User " + target + " not found\n");
-				return;
-			}
-			sendMsg(targetFd, _clients[clientFd].getNickname() + ": " + message + "\n");
-		}
-	} else if (cmd == "KICK") {
-		std::string channel, target;
-		iss >> channel >> target;
-		if (channel.empty() || target.empty()) {
-			sendMsg(clientFd, "ERROR: Channel and target cannot be empty\n");
-			return;
-		}
-		if (_channels.find(channel) == _channels.end()) {
-			sendMsg(clientFd, "ERROR: Channel " + channel + " does not exist\n");
-			return;
-		}
-		if (_channelAdmins[channel].find(clientFd) == _channelAdmins[channel].end()) {
-			sendMsg(clientFd, "ERROR: You are not an operator in channel " + channel + "\n");
-			return;
-		}
-		if (_channels[channel].find(clientFd) == _channels[channel].end()) {
-			sendMsg(clientFd, "ERROR: User " + target + " not found in channel " + channel + "\n");
-			return;
-		}
-		
-		int targetFd = -1;
-		for (const auto& pair : _clients) {
-			if (pair.second.getNickname() == target) {
-				targetFd = pair.first;
-				break;
-			}
-		}
-		if (targetFd == -1 || _channels[channel].find(targetFd) == _channels[channel].end()) {
-			sendMsg(clientFd, "ERROR: User " + target + " not found in channel " + channel + "\n");
-			return;
-		}
+        for (const auto& pair : _clients) {
+            if (pair.second.getNickname() == nickname) {
+                sendMsg(clientFd, "ERROR: Nickname already in use\r\n");
+                return;
+            }
+        }
+        _clients[clientFd].setNickname(nickname);
+        sendMsg(clientFd, "Nickname set to: " + nickname + "\r\n");
 
-		std::string reason;
-		std::getline(iss, reason);
-		if (!reason.empty() && reason[0] == ' ') reason.erase(0, 1);
-		if (reason.empty()) {
-			reason = "You have been kicked from the channel";
-		}
-		_channels[channel].erase(targetFd);
-		_clients[targetFd].partChannel(channel);
-		
-		sendMsg(targetFd, "You have been kicked from channel " + channel + "\n");
+    } else if (cmd == "JOIN") {
+        if (_clients[clientFd].getNickname().empty()) {
+            sendMsg(clientFd, "ERROR: You must set a nickname first\r\n");
+            return;
+        }
+        if (args.empty()) {
+            sendMsg(clientFd, "ERROR: Channel cannot be empty\r\n");
+            return;
+        }
+        const std::string& channel = args[0];
+        if (channel[0] != '#') {
+            sendMsg(clientFd, "ERROR: Channel name must start with #\r\n");
+            return;
+        }
 
-		for (int fd : _channels[channel]) {
-				sendMsg(fd, _clients[clientFd].getNickname() + " kicked " + target + " from channel " + channel + "\n");
-		}
-	}
-    else if (cmd == "INVITE") {
-        std::string username, channel;
-		iss >> username >> channel;
-		if (username.empty() || channel.empty()) {
-			sendMsg(clientFd, "ERROR: Username and channel cannot be empty\n");
-			return;
-		}
-		if (_channels.find(channel) == _channels.end() || _channels[channel].find(clientFd) == _channels[channel].end()) {
-			sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
-			return;
-		}
-		int targetFd = -1;
-		for (const auto& pair : _clients) {
-			if (pair.second.getNickname() == username) {
-				targetFd = pair.first;
-				break;
-			}
-		}
-		if (targetFd == -1) {
-			sendMsg(clientFd, "ERROR: User " + username + " not found\n");
-			return;
-		}
-		_channelInvites[channel].insert(targetFd);
-		sendMsg(targetFd, "You have been invited to join channel " + channel + "\n");
-		sendMsg(clientFd, "User " + username + " has been invited to channel " + channel + "\n");
+        Channel& ch = _channels[channel];
+        if (ch.checkUser(clientFd)) {
+            sendMsg(clientFd, "ERROR: Already in channel " + channel + "\r\n");
+            return;
+        }
+        if (ch.isModeEnabled('i') && !ch.checkInvite(clientFd)) {
+            sendMsg(clientFd, "ERROR: Channel " + channel + " is invite-only\r\n");
+            return;
+        }
+        if (!ch.validateLimit()) {
+            sendMsg(clientFd, "ERROR: Channel " + channel + " is full\r\n");
+            return;
+        }
+
+        ch.userAddition(clientFd);
+        _clients[clientFd].addChannel(channel);
+        ch.deleteInvite(clientFd);
+        if (ch.totalMemberNum() == 1) {
+            ch.giveOperator(clientFd);
+        }
+        sendMsg(clientFd, "Joined channel: " + channel + "\r\n");
+
+        for (int fd : ch.getMembers()) {
+            if (fd != clientFd) {
+                sendMsg(fd, _clients[clientFd].getNickname() + " has joined the channel\r\n");
+            }
+        }
     }
-	else if (cmd == "TOPIC") {
-        std::string channel;
-		std::string topic;
-		iss >> channel;
-		std::getline(iss, topic);
-		if (channel.empty() || topic.empty()) {
-			sendMsg(clientFd, "ERROR: Channel and topic cannot be empty\n");
-			return;
-		}
-		if (!topic.empty() && topic[0] == ' '){
-			topic.erase(0, 1);
-		}
-		if (topic.empty()) {
-			if (_channelTopics.find(channel) != _channelTopics.end()) {
-				sendMsg(clientFd, "Current topic for " + channel + ": " + _channelTopics[channel] + "\n");
-			} else 
-				sendMsg(clientFd, "No topic set for channel " + channel + "\n");
-		} else {
-			_channelTopics[channel] = topic;
-			sendMsg(clientFd, "Topic for channel " + channel + " set to: " + topic + "\n");
-		}
-    }
-    else if (cmd == "MODE") {
-        std::string channel, mode;
-		iss >> channel >> mode;
-		if (channel.empty() || mode.empty()) {
-			sendMsg(clientFd, "ERROR: Channel and mode cannot be empty\n");
-			return;
-		}
-		if (_channels[channel].find(clientFd) == _channels[channel].end()) {
-			sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
-			return;
-		}
-		if (mode == "+i") {
-			_channelModes[channel].insert('i');
-			sendMsg(clientFd, "Invite-only mode set for channel " + channel + "\n");
-		} else if (mode == "-i") {
-			_channelModes[channel].erase('i');
-			sendMsg(clientFd, "Invite-only mode removed for channel " + channel + "\n");
-		} else {
-			sendMsg(clientFd, "ERROR: Unknown mode " + mode + "\n");
-			return;
-		}
-    }
-	else if (cmd == "WHO") {
-		std::string channel;
-		iss >> channel;
-		if (!channel.empty()) {
-			if (_channels.find(channel) == _channels.end()){
-				sendMsg(clientFd, "ERROR: Channel " + channel + " does not exist\n");
-				return;
-			}
-			if (_channels[channel].find(clientFd) == _channels[channel].end()) {
-				sendMsg(clientFd, "ERROR: Not in channel " + channel + "\n");
-				return;
-			}
-			sendMsg(clientFd, "Users in channel " + channel + ":\n");
-			for (int fd : _channels[channel]) {
-				std::string nickname = _clients[fd].getNickname();
-				if (!nickname.empty()) {
-					sendMsg(clientFd, nickname + "\n");
-				}
-			}
-		} else if (cmd == "QUIT") {
-			std::string quit;
-			std::getline(iss, quit);
-			if (!quit.empty() && quit[0] == ' ') 
-				quit = quit.substr(1);
-			else
-				quit = "Client disconnected";
 
-			std::string nickname = _clients[clientFd].getNickname();
-			for (std::set<std::string>::iterator it = _clients[clientFd].getChannels().begin();
-				it != _clients[clientFd].getChannels().end(); ++it) {
-				std::string channel = *it;
-				_channels[channel].erase(clientFd);
-				
-				for (std::set<int>::iterator it2 = _channels[channel].begin();
-					it2 != _channels[channel].end(); ++it2) {
-					sendMsg(*it2, nickname + " has left the channel " + channel + ": " + quit + "\n");
-				}
-				if (_channels[channel].empty()) {
-					_channels.erase(channel);
-					_channelAdmins.erase(channel);
-					_channelTopics.erase(channel);
-					_channelModes.erase(channel);
-					_channelInvites.erase(channel);
-				}
-			}
-			close(clientFd);
-			_clients.erase(clientFd);
-			removeFromPollfd(clientFd);
-			std::cout << "Client " << clientFd << " disconnected: " << quit << std::endl;
-			
-		} else {
-			sendMsg(clientFd, "All connected users:\n");
-			for (const auto& pair : _clients) {
-				std::string nickname = pair.second.getNickname();
-				if (!nickname.empty()) {
-					sendMsg(clientFd, nickname + "\n");
-				}
-			}
-		}
-	}
-    else {
-        sendMsg(clientFd, "421 " + cmd + " :Unknown command\r\n");
-    }
-	std::cout << "Parsed command from client " << clientFd << ": [" << cmd << "] Full line: [" << command << "]" << std::endl;
+    std::cout << "Parsed command from client " << clientFd << ": [" << cmd << "] Full line: [" << line << "]" << std::endl;
 }
-
 
 void Server::sendMsg(int clientFd, const std::string& msg) {
-	send(clientFd, msg.c_str(), msg.size(), 0);
+    send(clientFd, msg.c_str(), msg.size(), 0);
 }
+
 void Server::removeFromPollfd(int clientFd) {
-	for (std::vector<struct pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
-		if (it->fd == clientFd) {
-			_pollfds.erase(it);
-			break;
-		}
-	}
+    for (std::vector<struct pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
+        if (it->fd == clientFd) {
+            _pollfds.erase(it);
+            break;
+        }
+    }
 }
 
 void Server::removeClient(int clientFd) {
-	close(clientFd);
-	_clients.erase(clientFd);
-
-	// Remove the client from the pollfd list
-	for (size_t i = 0; i < _pollfds.size(); ++i) {
-		if (_pollfds[i].fd == clientFd) {
-			_pollfds.erase(_pollfds.begin() + i);
-			break;
-		}
-	}
-
-	std::cout << "Client disconnected! FD: " << clientFd << std::endl;
+    close(clientFd);
+    _clients.erase(clientFd);
+    for (size_t i = 0; i < _pollfds.size(); ++i) {
+        if (_pollfds[i].fd == clientFd) {
+            _pollfds.erase(_pollfds.begin() + i);
+            break;
+        }
+    }
+    std::cout << "Client disconnected! FD: " << clientFd << std::endl;
 }
+

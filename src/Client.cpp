@@ -1,10 +1,10 @@
 #include "Client.hpp"
 
 Client::Client() : _fd(-1), _buffer(""), _nickname("") {}
-Client::Client(int fd) : _fd(fd), _buffer(""), _nickname("") {}
-Client::~Client() {
 
-}
+Client::Client(int fd) : _fd(fd), _buffer(""), _nickname("") {}
+
+Client::~Client() {}
 
 int Client::getFd() const {
 	return _fd;
@@ -13,6 +13,7 @@ int Client::getFd() const {
 void Client::appendBuffer(const std::string& data) {
 	_buffer += data;
 }
+
 std::string &Client::getBuffer() {
 	return _buffer;
 }
@@ -40,4 +41,3 @@ bool Client::isInChannel(const std::string& channel) const {
 const std::set<std::string>& Client::getChannels() const {
 	return _channels;
 }
-// Destructor to close the sock

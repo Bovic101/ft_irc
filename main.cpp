@@ -1,8 +1,10 @@
 #include <iostream> 
 #include <string> 
 #include <exception>
+#include <cstdlib> // added
 
 #include "Server.hpp"
+#include "channel.hpp"
 
 int main(int argc, char **argv) {
 	if (argc != 3) {
@@ -23,4 +25,5 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
+
 
