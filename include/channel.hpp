@@ -50,7 +50,6 @@ class Channel
         void enableKey(const std::string& key); //To enable key
         bool validateKey(const std::string& key) const; //This compare key to authenticate
 
-
         //Method for Channel User limit
         void limitSetter(int num); // This set channel user limit
         bool validateLimit() const; //Check if user count is greater than or = limit
@@ -62,12 +61,13 @@ class Channel
 
         //additional methods
         void kickUser(int fd); //To kick user from channel
-        bool keyProtecctedChecker() const; //check if channel is key protected
-        const std::string& getChannelkey() const; //To get channel key
+        bool keyProtectedChecker() const; //check if channel is key protected
+        const std::string& getChannelKey() const; //To get channel key
         void revokeKey(); //This revoke channel key and disable key mode(k)
         bool topicOperatorSetter(int fd) const; //To check if user is operator to set topic(mode+t)
         void PermittedUserTopicSetter(int topicsetterFd, const std::string& topic); //To set topic by only if the user is permitted
         void upgradeUserToOperator(int fd); //To upgrade user to operator
         void downgradeUserFromOperator(int fd); //To downgrade user from operator
 };
+
 #endif
