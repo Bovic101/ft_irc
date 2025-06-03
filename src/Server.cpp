@@ -420,37 +420,75 @@ void Server::parseCommand(int clientFd, const std::string& line) {
             sendMsg(clientFd, "ERROR: Invalid mode sign. Use + or -\r\n");
             return;
         }
-    // } else if (cmd == "KICK"){
-    //     if (args.size() < 2) {
-    //         sendMsg(clientFd, "ERROR: KICK requires a user and a channel\r\n");
-    //         return;
-    //     }
-    //     const std::string& targetUser = args[0];
-    //     const std::string& targetChannel = args[1];
-    //     if (targetChannel[0] != '#') {
-    //         sendMsg(clientFd, "ERROR: Channel name must start with #\r\n");
-    //         return;
-    //     }
-    //     if (_channels.find(targetChannel) == _channels.end()) {
-    //         sendMsg(clientFd, "ERROR: Channel " + targetChannel + " does not exist\r\n");
-    //         return;
-    //     }
-    //     Channel& channel = _channels[targetChannel];
-    //     if (!channel.checkUser(clientFd)) {
-    //         sendMsg(clientFd, "ERROR: You are not in channel " + targetChannel + "\r\n");
-    //         return;
-    //     }
-    //     if (!channel.checkOperator(clientFd)) {
-    //         sendMsg(clientFd, "ERROR: You are not a channel operator\r\n");
-    //         return;
-    //     }
-    //     int targetFd = -1;
-
-    // }
+    } else if (cmd == "KICK"){
+        if (args.size() < 2) {
+            sendMsg(clientFd, "ERROR: KICK requires a user and a channel\r\n");
+            return;
+        }
+        const std::string& targetUser = args[0];
+        const std::string& targetChannel = args[1];
+        if (targetChannel[0] != '#') {
+            sendMsg(clientFd, "ERROR: Channel name must start with #\r\n");
+            return;
+        }
+        if (_channels.find(targetChannel) == _channels.end()) {
+            sendMsg(clientFd, "ERROR: Channel " + targetChannel + " does not exist\r\n");
+            return;
+        }
+        Channel& channel = _channels[targetChannel];
+        if (!channel.checkUser(clientFd)) {
+            sendMsg(clientFd, "ERROR: You are not in channel " + targetChannel + "\r\n");
+            return;
+        }
+        if (!channel.checkOperator(clientFd)) {
+            sendMsg(clientFd, "ERROR: You are not a channel operator\r\n");
+            return;
+        }
+        int targetFd = -1;
+        for (const auto& pair : _clients) {
+            if (pair.second.getNickname() == targetUser) {
+                targetFd = pair.first;
+                break;
+            }
+        }
+        if (targetFd == -1) {
+            sendMsg(clientFd, "ERROR: User " + targetUser + " not found\r\n");
+            return;
+        }
+        if (!channel.checkUser(targetFd)) {
+            sendMsg(clientFd, "ERROR: User " + targetUser + " is not in channel " + targetChannel + "\r\n");
+            return;
+        }
+        channel.kickUser(targetFd);
+        _clients[targetFd].partChannel(targetChannel);
+        sendMsg(clientFd, "Kicked " + targetUser + " from channel " + targetChannel + "\r\n");
+        for (int fd : channel.getMembers()) {
+            if (fd != clientFd && fd != targetFd) {
+                sendMsg(fd, _clients[clientFd].getNickname() + " has kicked " + targetUser + " from the channel\r\n");
+            }
+        }
+    }else if (cmd == "QUIT"){
+        std::string quitMessage = args.empty() ? "Client disconnected" : args[0];
+        for (const std::string& channelName : _clients[clientFd].getChannels()) {
+            Channel& channel = _channels[channelName];
+            for (int fd : channel.getMembers()) {
+                if (fd != clientFd) {
+                    sendMsg(fd, _clients[clientFd].getNickname() + " has left the channel: " + channelName + "\r\n");
+                }
+            }
+            channel.userDeletion(clientFd);
+        }
+        sendMsg(clientFd, "GOODBYE!: " + quitMessage + "\r\n");
+        _clients.erase(clientFd);
+        removeFromPollfd(clientFd);
+        close(clientFd);
+        std::cout << "Client " << clientFd << " disconnected: " << quitMessage << std::endl;
+    } else {
+        sendMsg(clientFd, "ERROR: Unknown command: " + cmd + "\r\n");
+        std::cout << "Unknown command received from client " << clientFd << ": " << cmd << std::endl;
+        return;
     }
 }
-
-
     std::cout << "Parsed command from client " << clientFd << ": [" << cmd << "] Full line: [" << line << "]" << std::endl;
 }
 
