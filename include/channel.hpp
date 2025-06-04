@@ -40,6 +40,8 @@ class Channel
         void giveOperator(int fd); //To give operator status to user
         void revokeOperator(int fd); //Revoke operator status
         bool checkOperator(int fd) const; // To check if the user has operator status
+        //check channel name
+        const std::string& getChannelName() const; //To get channel name
 
         //Method for invitation of user
         void inviteUser(int fd); //To add user by invite

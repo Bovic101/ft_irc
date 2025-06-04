@@ -190,3 +190,8 @@ void Channel::downgradeUserFromOperator(int fd) {
         throw std::runtime_error("User is not an operator in the channel.");
     }
 }
+//To get channel name
+const std::string& Channel::getChannelName() const {
+    return _channelName;
+}
+
