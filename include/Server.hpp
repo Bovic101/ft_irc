@@ -20,25 +20,25 @@
 
 class Server {
 public:
-    Server(int port, const std::string &password);
-    ~Server();
+    Server(int port, const std::string &password); // Constructor
+    ~Server(); // Destructor
 
-    void start(); // This will start the server loop
-    void setupSocket(); // This will set up the server socket
-    void acceptNewClient(); // This will accept new clients
-    void removeClient(int clientFd);
-    void parseCommand(int fd, const std::string& command);
-    void handleClientMessage(int clientFd);
-    void sendMsg(int clientFd, const std::string& msg);
-    void removeFromPollfd(int clientFd);
+    void start(); // Starts the server loop
+    void setupSocket(); // Sets up the socket
+    void acceptNewClient(); // Accepts a new client
+    void handleClientMessage(int clientFd); // Handles messages from a client
+    void parseCommand(int clientFd, const std::string& line); // Parses client commands
+    void sendMsg(int clientFd, const std::string& msg); // Sends a message to client
+    void removeClient(int clientFd); // Removes a client
+    void removeFromPollfd(int clientFd); // Removes file descriptor from poll list
 
 private:
-    int _port;
-    std::string _password;
-    std::vector<struct pollfd> _pollfds;
-    std::map<int, Client> _clients;
-    std::map<std::string, Channel> _channels;
-    int _serverSocket;
+    int _port; // Server port
+    std::string _password; // Server password
+    int _serverSocket; // Main server socket file descriptor
+    std::vector<struct pollfd> _pollfds; // Vector of pollfd structures
+    std::map<int, Client> _clients; // Map of client file descriptors to Client objects
+    std::map<std::string, Channel> _channels; // Map of channel names to Channel objects
 };
 
-#endif
+#endif // SERVER_HPP

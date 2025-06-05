@@ -23,10 +23,10 @@ void Server::setupSocket() {
     addr.sin_port = htons(_port);
 
     if (bind(_serverSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-        throw std::runtime_error("Failed to bind");
+        throw std::runtime_error("Failure to bind");
 
     if (listen(_serverSocket, SOMAXCONN) < 0)
-        throw std::runtime_error("Failed to listen");
+        throw std::runtime_error("Failure to listen");
 
     pollfd pfd;
     pfd.fd = _serverSocket;
@@ -51,7 +51,7 @@ void Server::acceptNewClient() {
     clientPfd.events = POLLIN;
     _pollfds.push_back(clientPfd);
 
-    std::cout << "New client connected! FD: " << clientFd << std::endl;
+    std::cout << "A new client is connected! FD: " << clientFd << std::endl;
 }
 
 void Server::start() {
@@ -116,7 +116,7 @@ void Server::removeClient(int clientFd) {
             break;
         }
     }
-    std::cout << "Client disconnected! FD: " << clientFd << std::endl;
+    std::cout << "The client has been disconnected! FD: " << clientFd << std::endl;
 }
 
 void Server::parseCommand(int clientFd, const std::string& line) {
@@ -124,7 +124,36 @@ void Server::parseCommand(int clientFd, const std::string& line) {
     const std::string& cmd = parsed.command;
     const std::vector<std::string>& args = parsed.args;
 
-    if (cmd == "NICK") {
+    if (cmd == "PASS") {
+        if (args.empty()) {
+            sendMsg(clientFd, "ERROR: The PASS command requires a password\r\n");
+            return;
+        }
+        if (_clients[clientFd].authenticatedCheckerFunc()) {
+            sendMsg(clientFd, "ERROR: Already authenticated\r\n");
+            return;
+        }
+        if (args[0] != _password) {
+            sendMsg(clientFd, "ERROR:Check, Incorrect password\r\n");
+            return;
+        }
+        _clients[clientFd].grantAuth(true);
+        sendMsg(clientFd, "Password validated and accepted\r\n");
+    } 
+    else if (cmd == "USER") {
+        if (!_clients[clientFd].authenticatedCheckerFunc()) {
+            sendMsg(clientFd, "ERROR: Please,authenticate with PASS first\r\n");
+            return;
+        }
+        if (args.size() < 4) {
+            sendMsg(clientFd, "ERROR: USER command requires 4 parameters\r\n");
+            return;
+        }
+        _clients[clientFd].setUsername(args[0]);
+        _clients[clientFd].markAsRegistered(true);
+        sendMsg(clientFd, "The user has been registered successfully\r\n");
+    } 
+    else if (cmd == "NICK") {
         if (args.empty()) return sendMsg(clientFd, "ERROR: Nickname cannot be empty\r\n");
         const std::string& nick = args[0];
         for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
@@ -134,7 +163,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
         _clients[clientFd].setNickname(nick);
         sendMsg(clientFd, "Nickname set to: " + nick + "\r\n");
     }
-
     else if (cmd == "JOIN") {
         if (_clients[clientFd].getNickname().empty()) {
             sendMsg(clientFd, "ERROR: You must set a nickname first\r\n");
@@ -190,7 +218,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
         }
         sendMsg(clientFd, response);
     }
-
     else if (cmd == "INVITE") {
         if (args.size() < 2) return sendMsg(clientFd, "ERROR: INVITE requires a user and a channel\r\n");
         const std::string& targetUser = args[0];
@@ -216,33 +243,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
         ch.inviteUser(targetFd);
         sendMsg(targetFd, "You have been invited to join channel " + chName + "\r\n");
     }
-
-    else if (cmd == "INVITE") {
-        if (args.size() < 2) return sendMsg(clientFd, "ERROR: INVITE requires a user and a channel\r\n");
-        const std::string& targetUser = args[0];
-        const std::string& chName = args[1];
-
-        if (_channels.find(chName) == _channels.end())
-            return sendMsg(clientFd, "ERROR: Channel " + chName + " not found\r\n");
-
-        Channel& ch = _channels[chName];
-        if (!ch.checkOperator(clientFd))
-            return sendMsg(clientFd, "ERROR: You are not an operator of the channel\r\n");
-
-        int targetFd = -1;
-        for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-            if (it->second.getNickname() == targetUser) {
-                targetFd = it->first;
-                break;
-            }
-        }
-        if (targetFd == -1)
-            return sendMsg(clientFd, "ERROR: User not found\r\n");
-
-        ch.inviteUser(targetFd);
-        sendMsg(targetFd, "You have been invited to join channel " + chName + "\r\n");
-    }
-
     else if (cmd == "PRIVMSG") {
         if (args.size() < 2) return sendMsg(clientFd, "ERROR: PRIVMSG requires a target and a message\r\n");
         const std::string& target = args[0];
@@ -270,7 +270,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
             sendMsg(clientFd, "ERROR: No such user\r\n");
         }
     }
-
     else if (cmd == "PART") {
         if (args.empty()) return sendMsg(clientFd, "ERROR: PART requires a channel name\r\n");
         const std::string& chName = args[0];
@@ -286,7 +285,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
             sendMsg(fd, _clients[clientFd].getNickname() + " has left the channel\r\n");
         }
     }
-
     else if (cmd == "TOPIC") {
         if (args.empty()) return sendMsg(clientFd, "ERROR: TOPIC requires a channel name\r\n");
         const std::string& chName = args[0];
@@ -308,7 +306,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
                 sendMsg(fd, "Channel topic changed to: " + newTopic + "\r\n");
         }
     }
-
     else if (cmd == "MODE") {
         if (args.size() < 2)
             return sendMsg(clientFd, "ERROR: MODE <#channel> <+mode|-mode> [param]\r\n");
@@ -337,7 +334,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
             sendMsg(clientFd, "ERROR: Invalid mode\r\n");
         }
     }
-
     else if (cmd == "KICK") {
         if (args.size() < 2)
             return sendMsg(clientFd, "ERROR: KICK <user> <#channel>\r\n");
@@ -364,7 +360,6 @@ void Server::parseCommand(int clientFd, const std::string& line) {
         _clients[targetFd].partChannel(chName);
         sendMsg(clientFd, "User kicked\r\n");
     }
-
     else if (cmd == "QUIT") {
         std::string quitMsg = args.empty() ? "Client quit" : args[0];
         for (std::map<std::string, Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
@@ -377,7 +372,7 @@ void Server::parseCommand(int clientFd, const std::string& line) {
                 }
             }
         }
-        sendMsg(clientFd, "GOODBYE\r\n");
+        sendMsg(clientFd, "Terminated,Bye!\r\n");
         removeClient(clientFd);
     }
 
