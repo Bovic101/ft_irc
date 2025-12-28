@@ -42,12 +42,14 @@ Build the program
 make
 
 Run
+```bash
 ./ircserv <port> <password>
 
 Example
 ./ircserv 6667 pass
 
 Test(netcat)
+```bash
 nc 127.0.0.1 6667
 
 Passing ARG
