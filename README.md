@@ -33,10 +33,31 @@ Supports **multiple concurrent clients** and **real-time messaging** using **TCP
 ## Build
 
 ### Requirements
-- Linux
-- C++ compiler (e.g., `c++`, `g++`, `clang++`)
+- Linux and C++ experience
+- C++ compiler
 
 ### Compile
-If you have a Makefile:
+Build the program 
 ```bash
 make
+
+Run
+./ircserv <port> <password>
+
+Example
+./ircserv 6667 pass
+
+Test(netcat)
+nc 127.0.0.1 6667
+
+Passing ARG
+Example:
+PASS pass
+USER Vic 0 * :Vic Ode
+NICK bovic
+JOIN #general
+PRIVMSG #general :hello guys
+LIST
+TOPIC #general :Music bews
+PART #general
+QUIT :bye
