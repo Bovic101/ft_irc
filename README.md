@@ -46,7 +46,6 @@ QUIT :Thank you
 - `include/channel.hpp`, `src/channel.cpp` — channel management.
 - `include/parse_input.hpp`, `src/parse_input.cpp` — command parsing.
 - `Makefile` — build targets: `make`, `make clean`, `make fclean`, `make re`.
-- `test_irc.sh` — helper script for manual testing.
 
 
 ## Features
