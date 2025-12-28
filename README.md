@@ -40,6 +40,3 @@ Supports **multiple concurrent clients** and **real-time messaging** using **TCP
 Build the program 
 ```bash
 make
-
-```bash
-./ircserv <port> <password>
