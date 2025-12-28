@@ -14,7 +14,7 @@ Copy and paste these commands to build and run the server, then connect with `ne
 
 ```bash
 # 1) Build the project
-make
+Use the command "make"
 This compile and produces the executable `ircserv` 
 
 # 2) Start the server (replace port/password as needed)
