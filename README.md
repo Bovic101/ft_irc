@@ -1,55 +1,45 @@
 # ft_irc — C++ IRC Server
 
-A lightweight IRC-style server implemented in C++ for learning network and systems programming. Supports multiple concurrent clients, channels, and a subset of IRC commands.
-
-**Build**
+A lightweight IRC-style server written in C++ for Linux, supporting multiple concurrent clients and real-time messaging using TCP sockets, non-blocking I/O, and poll() for efficient event handling.
 
 **Requirements:** 
-- Linux and C++ experience
-
-### Compile
-If you have a Makefile:
-```bash
-make
+- Linux and C++ programming experience
 
 
-Run:
 
-```bash
-make
-```
 
-This produces the executable `ircserv` (see [Makefile](Makefile)).
-
-## Quick Start — Copy & Paste
+## Run
 
 Copy and paste these commands to build and run the server, then connect with `netcat`.
 
 ```bash
 # 1) Build the project
 make
+This compile and produces the executable `ircserv` 
 
 # 2) Start the server (replace port/password as needed)
-./ircserv 6667 secretpass
+`./ircserv <port> <password>`
+Example
+./ircserv 6667 pass
 
-# 3) In another terminal, connect using netcat (or use an IRC client)
+# 3) Open another terminal and copy this command, connect using netcat
 nc localhost 6667
+or 
+nc 127.0.0.1 6667
 
-# Example: send raw commands (replace with proper IRC flow)
-# PASS pass
-# NICK Bovic
-# USER newuser 0 * :Bobo Victor
+Try these commands: 
+PASS pass
+USER victor 0 * :Victor Bobo
+NICK Bovic
+JOIN #general
+PRIVMSG #general :hello guys
+LIST
+TOPIC #general :Music room
+PART #general
+QUIT :Thank you
 ```
 
 ## Usage
-
-`./ircserv <port> <password>`
-
-Example:
-
-```bash
-./ircserv 6667 pass
-```
 
 ## Project structure
 
