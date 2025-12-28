@@ -41,7 +41,6 @@ Build the program
 ```bash
 make
 
+##Run
 ```bash
 ./ircserv <port> <password>
-
-
