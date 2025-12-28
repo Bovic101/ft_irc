@@ -22,7 +22,8 @@ This compile and produces the executable `ircserv`
 Example
 ./ircserv 6667 pass
 
-# 3) Open another terminal and copy this command, connect using netcat
+# 3) Open another terminal,connect using netcat to validate multi-client behaviour: 
+
 nc localhost 6667
 or 
 nc 127.0.0.1 6667
@@ -38,8 +39,6 @@ TOPIC #general :Music room
 PART #general
 QUIT :Thank you
 ```
-
-## Usage
 
 ## Project structure
 
