@@ -42,7 +42,6 @@ Build the program
 make
 
 Run
-```bash
 ./ircserv <port> <password>
 
 Example
@@ -52,7 +51,7 @@ Test(netcat)
 ```bash
 nc 127.0.0.1 6667
 
-Passing ARG
+Pass argument
 Example:
 PASS pass
 USER Vic 0 * :Vic Ode
@@ -63,3 +62,7 @@ LIST
 TOPIC #general :Music bews
 PART #general
 QUIT :bye
+
+Open multiple terminal and connect other client to validate multi-client behavior:
+
+nc 127.0.0.1 6667
