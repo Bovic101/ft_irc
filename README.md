@@ -1,11 +1,9 @@
-# ft_irc — C++ IRC Server
+# ft_irc project (IRC Server built in C++)
 
-A lightweight IRC-style server written in C++ for Linux, supporting multiple concurrent clients and real-time messaging using TCP sockets, non-blocking I/O, and poll() for efficient event handling.
+A lightweight IRC-style server project written in C++ for Linux, supporting multiple concurrent clients and real-time messaging using TCP sockets, non-blocking I/O, and poll() for efficient event handling.
 
 **Requirements:** 
 - Linux and C++ programming experience
-
-
 
 
 ## Run
