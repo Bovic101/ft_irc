@@ -40,29 +40,3 @@ Supports **multiple concurrent clients** and **real-time messaging** using **TCP
 Build the program 
 ```bash
 make
-
-Run
-./ircserv <port> <password>
-
-Example
-./ircserv 6667 pass
-
-Test(netcat)
-```bash
-nc 127.0.0.1 6667
-
-Pass argument
-Example:
-PASS pass
-USER Vic 0 * :Vic Ode
-NICK bovic
-JOIN #general
-PRIVMSG #general :hello guys
-LIST
-TOPIC #general :Music bews
-PART #general
-QUIT :bye
-
-Open multiple terminal and connect other client to validate multi-client behavior:
-
-nc 127.0.0.1 6667
