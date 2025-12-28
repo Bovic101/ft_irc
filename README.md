@@ -1,36 +1,86 @@
-ft_irc — Simple IRC-like server (C++)
+# ft_irc — C++ IRC Server
 
-**Project**
-- **Description:** Minimal IRC-like server implemented in C++ as an educational project. It accepts client connections, manages channels, and parses basic IRC commands.
+A lightweight IRC-style server implemented in C++ for learning network and systems programming. Supports multiple concurrent clients, channels, and a subset of IRC commands.
 
 **Build**
-- **Requirements:** `c++` compiler (C++17), `make`.
-- **Build:** run `make` which produces the executable `ircserv` (see [Makefile](Makefile)).
-- **Clean:** `make clean`, `make fclean`, `make re`.
 
-**Run**
-- **Usage:** `./ircserv <port> <password>` — starts the server on the given TCP port with the provided server password.
-- **Example:** `./ircserv 6667 secretpass`
+**Requirements:** 
+- Linux and C++ experience
 
-**Usage**
-- Connect an IRC-capable client (or `telnet`/`netcat`) to the server port and authenticate using the server password when required by the command flow implemented by the server.
+### Compile
+If you have a Makefile:
+```bash
+make
 
-**Code Structure**
-- **Entry point:** [main.cpp](main.cpp) — parses arguments and starts the `Server`.
-- **Core server:** [src/Server.cpp](src/Server.cpp) and [include/Server.hpp](include/Server.hpp) — main networking and event loop.
-- **Client handling:** [src/Client.cpp](src/Client.cpp) and [include/Client.hpp](include/Client.hpp).
-- **Channels:** [src/channel.cpp](src/channel.cpp) and [include/channel.hpp](include/channel.hpp).
-- **Input parsing:** [src/parse_input.cpp](src/parse_input.cpp) and [include/parse_input.hpp](include/parse_input.hpp).
 
-**Protocol Notes**
-- This project implements a subset of IRC functionality (channels, basic commands and message routing). It is intended for learning systems/network programming rather than production use.
+Run:
 
-**Testing**
-- A helper script `test_irc.sh` is included for quick manual tests; run `./test_irc.sh` to exercise common flows (ensure `ircserv` is built).
+```bash
+make
+```
 
-**Contributing**
-- Fork, make changes, and open a pull request. Keep changes focused and provide short descriptions of behavior changes.
+This produces the executable `ircserv` (see [Makefile](Makefile)).
 
-**License**
-- No license specified in this repository. Contact the author or add a license file if you want to distribute the code.
+## Quick Start — Copy & Paste
 
+Copy and paste these commands to build and run the server, then connect with `netcat`.
+
+```bash
+# 1) Build the project
+make
+
+# 2) Start the server (replace port/password as needed)
+./ircserv 6667 secretpass
+
+# 3) In another terminal, connect using netcat (or use an IRC client)
+nc localhost 6667
+
+# Example: send raw commands (replace with proper IRC flow)
+# PASS pass
+# NICK Bovic
+# USER newuser 0 * :Bobo Victor
+```
+
+## Usage
+
+`./ircserv <port> <password>`
+
+Example:
+
+```bash
+./ircserv 6667 pass
+```
+
+## Project structure
+
+- `main.cpp` — program entry, argument parsing, starts `Server`.
+- `include/Server.hpp`, `src/Server.cpp` — core networking and event loop.
+- `include/Client.hpp`, `src/Client.cpp` — per-client logic and buffering.
+- `include/channel.hpp`, `src/channel.cpp` — channel management.
+- `include/parse_input.hpp`, `src/parse_input.cpp` — command parsing.
+- `Makefile` — build targets: `make`, `make clean`, `make fclean`, `make re`.
+- `test_irc.sh` — helper script for manual testing.
+
+
+## Features
+
+### Concurrency / I/O model
+- TCP server lifecycle: `socket()` → `bind()` → `listen()` → `accept()`
+- Multi-client support with **I/O multiplexing** using **`poll()`**
+- **Non-blocking sockets** via `fcntl(fd, F_SETFL, O_NONBLOCK)`
+- Reusable port on restart using `setsockopt(SO_REUSEADDR)`
+
+### Implemented IRC-style commands
+- Authentication / registration: `PASS`, `USER`, `NICK`
+- Channels: `JOIN`, `PART`, `LIST`
+- Messaging: `PRIVMSG` (user or channel)
+- Channel management: `INVITE`, `KICK`, `TOPIC`, `MODE`
+- Exit: `QUIT`
+
+### Parsing & buffering
+- Per-client buffering to handle partial reads (`Client::_buffer`)
+- Extracts complete lines split by `\n` and strips optional `\r`
+- Command parsing includes:
+  - command normalization to uppercase
+  - whitespace tokenization
+  - support for `:` trailing-parameter style (IRC-like)
